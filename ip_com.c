@@ -39,7 +39,7 @@ int main(int argc,char *argv[]) {
     if(rank==0){
         printf("Enter M N K: \n");
         fflush(stdout);
-        scanf("%d %d %d",&M,&N,&K);
+        (void)scanf("%d %d %d",&M,&N,&K);
     }
 
     MPI_Bcast(&M,1,MPI_INT,0,MPI_COMM_WORLD);
