@@ -91,6 +91,7 @@ int main(int argc, char *argv[])
     int *local = malloc(chunk * sizeof(int));
 
     struct timespec start,end;
+    MPI_Status status;
 
     /* ROOT reads data */
     if(rank == 0)
@@ -104,8 +105,8 @@ int main(int argc, char *argv[])
         }
 
         fclose(fp);
-        
-        /* Sort sequential copy BEFORE MPI timing */
+
+        /* sequential sort for verification */
         quickSort(seq_data,0,SIZE-1);
     }
 
@@ -113,16 +114,40 @@ int main(int argc, char *argv[])
 
     clock_gettime(CLOCK_MONOTONIC,&start);
 
-    /* distribute data */
-    MPI_Scatter(data,chunk,MPI_INT,local,chunk,MPI_INT,0,MPI_COMM_WORLD);
+    /* MANUAL DATA DISTRIBUTION USING MPI_Send */
+    if(rank == 0)
+    {
+        for(int i=1;i<size;i++)
+        {
+            MPI_Send(data + i*chunk, chunk, MPI_INT, i, 0, MPI_COMM_WORLD);
+        }
 
-    /* local quicksort */
+        memcpy(local, data, chunk*sizeof(int));
+    }
+    else
+    {
+        MPI_Recv(local, chunk, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+    }
+
+    /* LOCAL QUICKSORT */
     quickSort(local,0,chunk-1);
 
-    /* gather results */
-    MPI_Gather(local,chunk,MPI_INT,data,chunk,MPI_INT,0,MPI_COMM_WORLD);
+    /* SEND SORTED CHUNKS BACK */
+    if(rank == 0)
+    {
+        memcpy(data, local, chunk*sizeof(int));
 
-    /* root merges sorted chunks */
+        for(int i=1;i<size;i++)
+        {
+            MPI_Recv(data + i*chunk, chunk, MPI_INT, i, 0, MPI_COMM_WORLD, &status);
+        }
+    }
+    else
+    {
+        MPI_Send(local, chunk, MPI_INT, 0, 0, MPI_COMM_WORLD);
+    }
+
+    /* ROOT MERGES SORTED CHUNKS */
     if(rank == 0)
     {
         int *temp = malloc(SIZE*sizeof(int));
